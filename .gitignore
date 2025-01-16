@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Virtual environment
+.venv/
+
+# Model and dataset files
+models/
+datasets/
+
+# Logs
+*.log
