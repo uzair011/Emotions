@@ -1,6 +1,6 @@
 import argparse
-from scripts.train_resnet import train_model
-from scripts.infer_resnet import predict_emotion
+from scripts.train_resnet18 import train_model
+from scripts.inference_resnet18 import predict_emotion
 
 def main():
     parser = argparse.ArgumentParser(description="Facial Emotion Detection")

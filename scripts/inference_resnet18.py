@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
+from torchvision.models import ResNet18_Weights
 from torchvision import transforms
 from PIL import Image
+import matplotlib.pyplot as plt
 
 # Define the Model Class (same as in training)
 class EmotionResNet18(nn.Module):
@@ -18,19 +20,27 @@ class EmotionResNet18(nn.Module):
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 # Load the Pre-trained Model
+# def load_model(model_path, device):
+#     model = resnet18(weights=None)
+#     model.fc = torch.nn.Linear(model.fc.in_features, 7)
+# #   model.load_state_dict(torch.load(model_path, map_location=device))
+#     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+#     model.eval()
+#     return model
+
 def load_model(model_path, device):
-    model = EmotionResNet18(num_classes=7).to(device)
+    model = EmotionResNet18(num_classes=7).to(device)  
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model
 
+
 # Preprocess the Input Image
 def preprocess_image(image_path):
     transform = transforms.Compose([
-        transforms.Grayscale(),               # FER2013 images are grayscale
         transforms.Resize((48, 48)),          # Resize to 48x48
         transforms.ToTensor(),                # Convert to tensor
-        transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize pixel values
+        transforms.Normalize(mean=[0.5] * 3, std=[0.5] * 3)  # Normalize pixel values for 3 channels
     ])
 
     image = Image.open(image_path).convert('RGB')  # Open image
@@ -43,6 +53,14 @@ def predict_emotion(image_path, model, device):
         output = model(image_tensor)
         predicted_class = torch.argmax(output, dim=1).item()
     return emotion_labels[predicted_class]
+
+
+def visualise_prediction(image_path, predicted_emotion): ### Here
+    image = Image.open(image_path)
+    plt.imshow(image)
+    plt.axis('off') # to hide the axes
+    plt.title(f"Predicted: {predicted_emotion}", fontsize=16, color="red") ### here
+    plt.show()
 
 # Main Function for Inference
 def main():
@@ -59,6 +77,10 @@ def main():
     # Perform inference
     emotion = predict_emotion(args.image, model, device)
     print(f"Predicted Emotion: {emotion}")
+
+    # visualise
+    visualise_prediction(args.image, emotion)
+
 
 if __name__ == "__main__":
     main()
