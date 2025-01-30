@@ -1,0 +1,5 @@
+git add .
+git commit -m "updated commit- 2nd"
+git remote add origin https://github.com/uzair011/Emotions.git - no need
+git branch -M main
+git push -u origin main

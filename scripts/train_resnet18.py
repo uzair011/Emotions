@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from torchvision import transforms, datasets
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Import the FER2013Dataset and transform utilities
 from utils.data_loader import FER2013Dataset, get_transforms
@@ -27,12 +28,12 @@ def get_model(num_classes=7):
 
 # Training Function
 def train_model(model, train_loader, val_loader, criterion, optimizer, device, epochs=10):
-    
-    train_loader = []
-    val_loader = []
+
+    train_losses = []
+    val_losses = []
     train_accuracies = []
     val_accuracies = []
-    
+
     for epoch in range(epochs):
         # Training Phase
         model.train()
@@ -69,7 +70,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, e
 
         # store metrics
         train_losses.append(train_loss / len(train_loader))
-        val_losses.apped(val_loss / len(val_loader))
+        val_losses.append(val_loss / len(val_loader))
         train_accuracies.append(train_correct / len(train_loader.dataset))
         val_accuracies.append(val_correct / len(val_loader.dataset))
 

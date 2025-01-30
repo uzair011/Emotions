@@ -20,20 +20,13 @@ class EmotionResNet18(nn.Module):
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 # Load the Pre-trained Model
-# def load_model(model_path, device):
-#     model = resnet18(weights=None)
-#     model.fc = torch.nn.Linear(model.fc.in_features, 7)
-# #   model.load_state_dict(torch.load(model_path, map_location=device))
-#     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-#     model.eval()
-#     return model
-
 def load_model(model_path, device):
-    model = EmotionResNet18(num_classes=7).to(device)  
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model = resnet18(weights=None)
+    model.fc = torch.nn.Linear(model.fc.in_features, 7)
+#   model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.eval()
     return model
-
 
 # Preprocess the Input Image
 def preprocess_image(image_path):
