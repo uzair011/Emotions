@@ -5,6 +5,7 @@ from torchvision.models import ResNet18_Weights
 from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
+import argparse
 
 # Define the Model Class (same as in training)
 class EmotionResNet18(nn.Module):
@@ -39,19 +40,30 @@ def preprocess_image(image_path):
     image = Image.open(image_path).convert('RGB')  # Open image
     return transform(image).unsqueeze(0)           # Add batch dimension
 
-# Predict Emotion
+# Predict top 3 Emotions with score
 def predict_emotion(image_path, model, device):
     image_tensor = preprocess_image(image_path).to(device)
     with torch.no_grad():
         output = model(image_tensor)
-        predicted_class = torch.argmax(output, dim=1).item()
-    return emotion_labels[predicted_class]
+        probabilities = torch.nn.functional.softmax(output, dim = 1)
+
+        #confidence, predicted_class = torch.max(probabilities, dim = 1)
+
+    # top 3
+    top3_prob, top3_indices = torch.topk(probabilities, 3)
+    top3_emotions = [emotion_labels[idx] for idx in top3_indices[0]]
+    top3_confidences = [prob.item() * 100 for prob in top3_prob[0]]
+
+    # output
+    prediction_string = " | ".join([f"{emotion} ({confidence: .2f}%)" for emotion, confidence in zip(top3_emotions, top3_confidences)])    
+
+    return prediction_string
 
 
 def visualise_prediction(image_path, predicted_emotion): ### Here
     image = Image.open(image_path)
     plt.imshow(image)
-    plt.axis('off') # to hide the axes
+    plt.axis('off') # hide axes
     plt.title(f"Predicted: {predicted_emotion}", fontsize=16, color="red") ### here
     plt.show()
 

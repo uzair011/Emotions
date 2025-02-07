@@ -20,7 +20,6 @@ import matplotlib.pyplot as plt
 from utils.data_loader import FER2013Dataset, get_transforms
 
 # Define the Model
-
 def get_model(num_classes=7):
     model = resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
@@ -75,11 +74,17 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, e
         val_accuracies.append(val_correct / len(val_loader.dataset))
 
         # Print Epoch Summary
+        # print(f"Epoch [{epoch + 1}/{epochs}] "
+        #       f"Train Loss: {train_loss / len(train_loader):.4f}, "
+        #       f"Train Acc: {train_correct / len(train_loader.dataset):.4f}, "
+        #       f"Val Loss: {val_loss / len(val_loader):.4f}, "
+        #       f"Val Acc: {val_correct / len(val_loader.dataset):.4f}")
+        
         print(f"Epoch [{epoch + 1}/{epochs}] "
-              f"Train Loss: {train_loss / len(train_loader):.4f}, "
-              f"Train Acc: {train_correct / len(train_loader.dataset):.4f}, "
-              f"Val Loss: {val_loss / len(val_loader):.4f}, "
-              f"Val Acc: {val_correct / len(val_loader.dataset):.4f}")
+              f"Train Loss: {train_losses[-1]:.4f}, "
+              f"Train Acc: {train_accuracies[-1]:.4f}, "
+              f"Val Loss: {val_losses[-1]:.4f}, "
+              f"Val Acc: {val_accuracies[-1]:.4f}")
 
     # plot metrics    
     plot_metrics(epochs, train_losses, val_losses, train_accuracies, val_accuracies)
