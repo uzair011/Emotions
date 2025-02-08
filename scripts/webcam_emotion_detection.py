@@ -6,8 +6,17 @@ from torchvision.models import resnet18
 from torchvision import transforms
 from PIL import Image
 
+
+# load haar cascade for face detection
+FACE_CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+FACE_CASCADE = cv2.CascadeClassifier(FACE_CASCADE_PATH)
+
+if FACE_CASCADE.empty():
+    raise FileNotFoundError(f"Could not load Haar cascade from {FACE_CASCADE_PATH}")
+
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
+# load traied model
 def load_model(model_path, device):
     model = resnet18(weights=None)
     model.fc = torch.nn.Linear(model.fc.in_features, len(emotion_labels))
@@ -15,7 +24,7 @@ def load_model(model_path, device):
     model.eval()
     return model
 
-
+# preprocess a SINGLE face screenshot
 def preprocess_frame(frame):
     transform = transforms.Compose([
         transforms.ToPILImage(),
@@ -26,10 +35,10 @@ def preprocess_frame(frame):
     return transform(frame).unsqueeze(0) # batch dimension
 
 
-def predict_emotion(frame, model, device):
-    image_tensor = preprocess_frame(frame).to(device)
+def predict_emotion(face, model, device):
+    face_image_tensor = preprocess_frame(face).to(device)
     with torch.no_grad():
-        output = model(image_tensor)
+        output = model(face_image_tensor)
         probabilities = torch.nn.functional.softmax(output, dim = 1)
 
     # top 3
@@ -42,7 +51,7 @@ def predict_emotion(frame, model, device):
 
     return prediction_string
 
-
+# real time webcam emotion and face detection
 def real_time_emotion_detection(model_path):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,12 +64,26 @@ def real_time_emotion_detection(model_path):
         if not ret:
             break # no frame capture, exit loop
         
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert bgr -> rgb 
+        # convert frame to grayscale (haar - grayscale images)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert bgr -> rgb 
 
-        prediction = predict_emotion(rgb_frame, model, device)
+        # DETECT FACE
+        faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor= 1.3, minNeighbors= 5, minSize= (50, 50))
+        #prediction = predict_emotion(rgb_frame, model, device)
 
-        # display prediction on video
-        cv2.putText(frame, prediction, [10, 40], cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+        for (x, y, w, h) in faces:
+            face_roi = frame [y: y+h, x: x+w] # to crop the face area
+
+            # predict emotion
+            prediction = predict_emotion(face_roi, model, device)    
+
+            # draw a box 
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            
+            # display predicted emotion text
+            cv2.putText(frame, prediction, [10, 40], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+
 
         # display webcam feed
         cv2.imshow("Real time Emotion Detection", frame)
