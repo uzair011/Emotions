@@ -2,6 +2,9 @@ import cv2
 import torch
 import torch.nn as nn
 import numpy as np
+import csv
+import os
+import datetime
 from torchvision.models import resnet18
 from torchvision import transforms
 from PIL import Image
@@ -49,7 +52,18 @@ def predict_emotion(face, model, device):
     # output
     prediction_string = " | ".join([f"{emotion} ({confidence: .1f}%)" for emotion, confidence in zip(top3_emotions, top3_confidences)])    
 
-    return prediction_string
+    return prediction_string, top3_emotions, top3_confidences
+
+
+def log_emotoins(timestamp, emotions, confidences, log_file = "emotions_log.csv"):
+    file_exists = os.path.isfile(log_file)
+
+    with open(log_file, mode="a", newline="") as file: # open csv
+        writer = csv.writer(file)  # csv header
+
+        if not file_exists:
+            writer.writerow(["Timestamp", emotions[0], confidences[0], emotions[1], confidences[1], emotions[2], confidences[2]]) # write on csv
+
 
 # real time webcam emotion and face detection
 def real_time_emotion_detection(model_path):
@@ -76,7 +90,11 @@ def real_time_emotion_detection(model_path):
             face_roi = frame [y: y+h, x: x+w] # to crop the face area
 
             # predict emotion
-            prediction = predict_emotion(face_roi, model, device)    
+            prediction, top3_emotions, top3_confidences = predict_emotion(face_roi, model, device)    
+
+            # log emotions
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_emotoins(timestamp, top3_emotions, top3_confidences)
 
             # draw a box 
             cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
