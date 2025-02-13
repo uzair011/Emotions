@@ -5,9 +5,16 @@ import numpy as np
 import csv
 import os
 import datetime
+import threading
 from torchvision.models import resnet18
 from torchvision import transforms
 from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from collections import deque
+
+import matplotlib
+matplotlib.use("TkAgg")  #  Force Matplotlib- working backend
 
 
 # load haar cascade for face detection
@@ -23,7 +30,7 @@ emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutr
 def load_model(model_path, device):
     model = resnet18(weights=None)
     model.fc = torch.nn.Linear(model.fc.in_features, len(emotion_labels))
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.eval()
     return model
 
@@ -52,17 +59,44 @@ def predict_emotion(face, model, device):
     # output
     prediction_string = " | ".join([f"{emotion} ({confidence: .1f}%)" for emotion, confidence in zip(top3_emotions, top3_confidences)])    
 
-    return prediction_string, top3_emotions, top3_confidences
+    return prediction_string, top3_emotions[0]
+
+# live data storage for live graphs
+#time_window = deque(["00:00:00", "00:00:01"], maxlen=30)  # store last 30 timestamps
+time_window = deque(maxlen=30)
+emotion_counts = {emotion: 0 for emotion in emotion_labels} # count every emotions
 
 
-def log_emotoins(timestamp, emotions, confidences, log_file = "emotions_log.csv"):
-    file_exists = os.path.isfile(log_file)
+def update_graphs(frame):
+    plt.clf() # clear older frame data  
+    
+    if not time_window:
+        return
 
-    with open(log_file, mode="a", newline="") as file: # open csv
-        writer = csv.writer(file)  # csv header
+    # filter emotions (ignore 0)
+    filtered_emotions = {k: v for k, v in emotion_counts.items() if v > 0}
 
-        if not file_exists:
-            writer.writerow(["Timestamp", emotions[0], confidences[0], emotions[1], confidences[1], emotions[2], confidences[2]]) # write on csv
+    if not filtered_emotions:
+        return
+
+    # line graph (emotion over time)
+    # plt.subplot(1, 2, 1)
+    # plt.plot(list(time_window), list(filtered_emotions.values()), marker='o')
+    # plt.title("Emotion Changes Over Time")
+    # plt.xlabel("Time")
+    # plt.ylabel("Frequency")
+    # plt.xticks(rotation=45)
+    # plt.ylim(0, max(filtered_emotions.values(), default=1) + 1)
+
+    # bar chat (for frequent emotion)
+    plt.subplot(1, 2, 2)
+    plt.bar(filtered_emotions.keys(), filtered_emotions.values(), color='skyblue')
+    plt.title("Most Detected Emotions")
+    plt.xticks(rotation=45)
+    plt.ylabel("Count")
+
+    plt.tight_layout()
+    plt.draw()
 
 
 # real time webcam emotion and face detection
@@ -73,6 +107,13 @@ def real_time_emotion_detection(model_path):
 
     capture = cv2.VideoCapture(0) # select the default webcam
 
+    # live graph
+    figure2 = plt.figure(figsize=(10, 5))
+    anim = animation.FuncAnimation(figure2, update_graphs, interval=1000, cache_frame_data=False)
+    #threading.Thread(target=plt.show, daemon=True).start()
+    plt.show(block=False)  # updating the graph without blocking the main thread
+
+
     while True:
         ret, frame = capture.read()
         if not ret:
@@ -80,7 +121,7 @@ def real_time_emotion_detection(model_path):
         
         # convert frame to grayscale (haar - grayscale images)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        #rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # convert bgr -> rgb 
+        #rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) 
 
         # DETECT FACE
         faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor= 1.3, minNeighbors= 5, minSize= (50, 50))
@@ -90,26 +131,32 @@ def real_time_emotion_detection(model_path):
             face_roi = frame [y: y+h, x: x+w] # to crop the face area
 
             # predict emotion
-            prediction, top3_emotions, top3_confidences = predict_emotion(face_roi, model, device)    
+            prediction, dominant_emotion= predict_emotion(face_roi, model, device)    
 
-            # log emotions
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            log_emotoins(timestamp, top3_emotions, top3_confidences)
+            # update garaph emotions
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            time_window.append(timestamp)
+            emotion_counts[dominant_emotion] += 1
 
             # draw a box 
             cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
             
             # display predicted emotion text
-            cv2.putText(frame, prediction, [10, 40], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.putText(frame, prediction, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-
-        # display webcam feed
+            # display webcam feed
         cv2.imshow("Real time Emotion Detection", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"): # q for quit
             break
 
-        # remove all resources
+        plt.pause(0.01) # force matplotlib to refresh/update the graph
+
+       
+
+        
+
+    # remove all resources
     capture.release()
     cv2.destroyAllWindows()
 
