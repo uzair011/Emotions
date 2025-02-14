@@ -45,6 +45,24 @@ def preprocess_frame(frame):
     return transform(frame).unsqueeze(0) # batch dimension
 
 
+def log_emotion(timestamp, emotions, confidences, log_file="emotions_log.csv"):
+    """Log emotions to a csv file"""
+    file_esists = os.path.isfile(log_file)
+
+    with open(log_file, mode="a", newline="") as f:
+        writer = csv.writer(f)
+
+        if not file_esists: # write header if file is new
+            header = ["Timestamp", "Emotion1", "Confidence1","Emotion2", "Confidence2","Emotion3", "Confidence3"]
+            writer.writerow(header)
+
+        row = [timestamp]  # inserting data to the rows  
+        for emo, conf in zip(emotions, confidences):
+            row += [emo, f"{conf: .1f}%"]
+
+        writer.writerow(row)    
+
+
 def predict_emotion(face, model, device):
     face_image_tensor = preprocess_frame(face).to(device)
     with torch.no_grad():
@@ -59,7 +77,7 @@ def predict_emotion(face, model, device):
     # output
     prediction_string = " | ".join([f"{emotion} ({confidence: .1f}%)" for emotion, confidence in zip(top3_emotions, top3_confidences)])    
 
-    return prediction_string, top3_emotions[0]
+    return (prediction_string, top3_emotions, top3_confidences, top3_emotions[0])
 
 # live data storage for live graphs
 #time_window = deque(["00:00:00", "00:00:01"], maxlen=30)  # store last 30 timestamps
@@ -125,18 +143,22 @@ def real_time_emotion_detection(model_path):
 
         # DETECT FACE
         faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor= 1.3, minNeighbors= 5, minSize= (50, 50))
-        #prediction = predict_emotion(rgb_frame, model, device)
+
 
         for (x, y, w, h) in faces:
             face_roi = frame [y: y+h, x: x+w] # to crop the face area
 
             # predict emotion
-            prediction, dominant_emotion= predict_emotion(face_roi, model, device)    
+            # prediction, dominant_emotion= predict_emotion(face_roi, model, device)    
+            prediction, emotions, confidences, dominant_emotion= predict_emotion(face_roi, model, device)    
 
             # update garaph emotions
-            timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             time_window.append(timestamp)
             emotion_counts[dominant_emotion] += 1
+
+            # log it to csv file
+            log_emotion(timestamp, emotions, confidences)
 
             # draw a box 
             cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
