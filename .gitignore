@@ -15,3 +15,4 @@ datasets/
 *.log
 
 ravdess-emotional-speech-audio.zip
+emotions_log.csv  
