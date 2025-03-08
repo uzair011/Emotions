@@ -100,7 +100,8 @@ def train_model():
         train_accuracies.append(correct / len(train_dataset))
 
         # evaluate on the test set
-        
+        model.eval()
+        test_correct, test_loss = 0, 0
 
 
 # Train Model
