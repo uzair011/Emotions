@@ -7,10 +7,11 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # HYPERPARAMETERS
 BATCH_SIZE = 32
-EPOCHS = 30
+EPOCHS = 34
 LEARNING_RATE = 0.001
 NUM_FEATURES = 13
 NUM_CLASSES = 7
@@ -52,7 +53,7 @@ test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 # define LSTM model for audio emotion recognition
 class AudioLSTM(nn.Module):
-    def __init__(self, input_size=NUM_FEATURES, hidden_size=64, num_layers=2, num_classes=NUM_CLASSES):
+    def __init__(self, input_size=NUM_FEATURES, hidden_size=128, num_layers=2, num_classes=NUM_CLASSES):
         super(AudioLSTM, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, num_classes)
@@ -81,7 +82,7 @@ def train_model():
     for epoch in range(EPOCHS):
         total_loss, correct = 0, 0
 
-        for features, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}"):
+        for features, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}"):    
             features, labels = features.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -92,20 +93,81 @@ def train_model():
 
             total_loss += loss.item()
             correct += (outputs.argmax(1) == labels).sum().item()
-        
-        #acc = correct / len(train_dataset)
-        #print(f"Epoch {epoch+1}: Loss={total_loss/len(train_loader):.4f}, Accuracy={acc:.4f}")
 
-        test_losses.append(total_loss / len(train_loader))
-        train_accuracies.append(correct / len(train_dataset))
+        train_loss = total_loss/ len(train_loader)
+        train_acc = correct / len(train_dataset)    
+        train_losses.append(train_loss)  # Track TRAIN loss
+        train_accuracies.append(train_acc)
 
         # evaluate on the test set
         model.eval()
         test_correct, test_loss = 0, 0
 
+        with torch.no_grad():
+            for features, labels in test_loader:
+                
+                features, labels = features.to(device), labels.to(device)
+                outputs = model(features)
+                loss = criterion(outputs, labels)
+
+                test_loss += loss.item()
+                test_correct += (outputs.argmax(1) == labels).sum().item()
+
+
+
+        test_loss = test_loss/ len(test_loader)
+        test_acc = test_correct/ len(test_dataset)
+        test_losses.append(test_loss)  # Track TEST loss
+        test_accuracies.append(test_acc)
+
+        # if train_losses and train_accuracies and test_losses and test_accuracies:
+        #     print(f"Epoch {epoch+1}: Train Loss={train_losses[-1]:.4f}, Train Acc={train_accuracies[-1]:.4f} | Test Loss={test_losses[-1]:.4f}, Test Acc={test_accuracies[-1]:.4f}")
+
+        print(f"Epoch {epoch+1}: "
+              f"Train Loss={train_loss:.4f}, Train Acc={train_acc:.4f} | "
+              f"Test Loss={test_loss:.4f}, Test Acc={test_acc:.4f}")
+
+
+#  visualize training results
+def plot_metrics():
+    epochs_range = range(1, EPOCHS + 1)
+
+    plt.figure(figsize=(12, 5))
+
+    # Loss Plot
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, train_losses, label='Train Loss', marker='o')
+    plt.plot(epochs_range, test_losses, label='Test Loss', marker='o')
+    plt.title("Loss Over Epochs")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+
+    # Accuracy Plot
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, train_accuracies, label='Train Accuracy', marker='o')
+    plt.plot(epochs_range, test_accuracies, label='Test Accuracy', marker='o')
+    plt.title("Accuracy Over Epochs")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy")
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
 
 # Train Model
 train_model()
+
+# Debugging:
+print(f"Train Losses: {train_losses}")
+print(f"Test Losses: {test_losses}")
+
+if not train_losses or not test_losses:
+    print("Error: Train/Test loss lists are empty. Check the training loop!")
+    exit()  # Stop script if data is missing
+
+plot_metrics()
+
 
 # Save Trained Model
 torch.save(model.state_dict(), "./models/audio_emotion_model.pth")
