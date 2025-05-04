@@ -1,51 +1,48 @@
- # Audio processing functions
-
 import librosa
 import numpy as np
 import torch
 import torch.nn as nn
 
-
 class AudioEmotionModel(nn.Module):
-    def __init__(self, input_size=13, hidden_size=128, num_layers=2, num_classes=7):
+    EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+    
+    def __init__(self, input_dim=39, hidden_dim=256, num_layers=3, num_classes=7):
         super().__init__()
         self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
+            input_size=input_dim,
+            hidden_size=hidden_dim,
             num_layers=num_layers,
+            bidirectional=True,  # bidirectional
             batch_first=True
         )
-        self.fc = nn.Linear(hidden_size, num_classes)
+        self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)  # x2 for bidirectional
 
     def forward(self, x):
         # Input shape: (batch_size, sequence_length, input_size)
         lstm_out, _ = self.lstm(x)
-        return self.fc(lstm_out[:, -1, :])  # Take last timestep output
+        lstm_out = self.dropout(lstm_out[:, -1, :])  # Take last timestep
+        return self.fc(lstm_out)
 
-def extract_features(y, sr):
-    """Should be in audio_utils.py"""
-    mfccs = librosa.feature.mfcc(
-        y=y, sr=sr, 
-        n_mfcc=13, 
-        n_fft=2048, 
-        hop_length=512,
-        n_mels=40
-    )
-    return mfccs.T  # (time_steps, 13)
-
-
-# def extract_features(audio, sr=16000, n_mfcc=13, n_fft=1024, hop_length=512):
-#     """Process audio chunk for real-time emotion prediction"""
-#     if len(audio) < n_fft:
-#         audio = np.pad(audio, (0, n_fft - len(audio)))
+def extract_features(audio, sr):
+    # Normalise audio first
+    audio = librosa.util.normalize(audio)
     
-#     audio_float = audio.astype(np.float32) / np.iinfo(np.int16).max
-#     mfccs = librosa.feature.mfcc(
-#         y=audio_float,
-#         sr=sr,
-#         n_mfcc=n_mfcc,
-#         n_fft=n_fft,
-#         hop_length=hop_length,
-#         center=False
-#     )
-#     return torch.tensor(mfccs.T[-1:], dtype=torch.float32).unsqueeze(0)    
+    # Extract MFCCs with proper settings
+    mfccs = librosa.feature.mfcc(
+        y=audio,
+        sr=sr,
+        n_mfcc=13,
+        n_fft=2048,
+        hop_length=512,
+        lifter=40
+    )
+    
+    # Add delta and delta-delta features
+    delta = librosa.feature.delta(mfccs)
+    delta2 = librosa.feature.delta(mfccs, order=2)
+    
+    # Combine features (13 MFCC + 13 delta + 13 delta2 = 39 features)
+    combined = np.concatenate([mfccs, delta, delta2], axis=0)
+    
+    return combined.T  # (time_steps, 39 features)

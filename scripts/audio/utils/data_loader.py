@@ -23,7 +23,7 @@ class AudioDataset(Dataset):
         # Features are stored as flat arrays in CSV
         flat_features = self.features[idx]
         # Reshape to (sequence_length, input_size)
-        features = flat_features.reshape(-1, 13)  # -1 infers sequence length
+        features = flat_features.reshape(-1, 39)  # -1 infers sequence length
         return torch.tensor(features, dtype=torch.float32), torch.tensor(self.labels[idx])
 
 def get_data_loaders(csv_path, batch_size=32, test_size=0.2):

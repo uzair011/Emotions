@@ -17,7 +17,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 # Import the FER2013Dataset and transform utilities
-from utils.data_loader import FER2013Dataset, get_transforms
+from utils.visual_data_loader import FER2013Dataset, get_transforms
 
 # Define the Model
 def get_model(num_classes=7):

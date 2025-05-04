@@ -1,239 +1,3 @@
-# # Real-time inference
-# import torch
-# import librosa
-# import numpy as np
-# import pyaudio
-# import matplotlib.pyplot as plt
-# import torch.nn as nn
-# import torch.optim as optim
-# import os
-# import soundfile as sf
-# from matplotlib.animation import FuncAnimation
-# from collections import deque
-# import time
-# from sklearn.metrics import classification_report, confusion_matrix
-# import seaborn as sns
-
-
-
-# # Load the trined model
-# class AudioEmotionModel(nn.Module):
-#     def __init__(self, input_size=13,
-#                 hidden_size=128,
-#                 num_layers=2,
-#                 num_classes=7):
-#         super().__init__()
-#         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-#         self.fc = nn.Linear(hidden_size, num_classes)
-
-#     def forward(self, x):
-#         out, _ = self.lstm(x)
-#         return self.fc(out[:, -1, :]) # select the last time stamp
-
-
-# # initialise the mosel
-# model = AudioEmotionModel()        
-# # load weights 
-# model.load_state_dict(torch.load(
-#     "./models/audio_emotion_model.pth",
-#     map_location = torch.device("cpu"),
-#     weights_only=True))
-# model.eval()
-
-# # CONSTANTS
-# # audio configuration
-# EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-# SAMPLE_RATE = 16000
-# CHUNK_SIZE = 1024 # 64ms audio chunks
-# N_FFT = 1024
-# HOP_LENGTH = 512
-
-# # visualisation configuration
-# plt.style.use('ggplot')
-# fig, ax = plt.subplots(figsize=(14, 6))
-# emotion_lines = {emotion: ax.plot([], [], label=emotion, alpha=0.8)[0] for emotion in EMOTIONS}
-# ax.set_ylim(0, 100)
-# ax.set_xlabel('Time (seconds)')
-# ax.set_ylabel('Confidence (%)')
-# ax.legend()
-
-# # data buffers
-# HISTORY_SECONDS = 10
-# BUFFER_SIZE = int(SAMPLE_RATE / CHUNK_SIZE * HISTORY_SECONDS)
-# time_buffer = deque(maxlen=BUFFER_SIZE)
-# emotion_history = {e: deque(maxlen=BUFFER_SIZE) for e in EMOTIONS}
-
-
-# # Record real time audio
-# #!!! we no longer need this utility function
-# def record_audio(filename="real_time.wav", duration=10, sr=SAMPLE_RATE):
-#     p = pyaudio.PyAudio()
-#     stream = p.open(format=pyaudio.paInt16, channels=1, rate=sr, input=True, frames_per_buffer=1024)
-    
-#     print(f"RRrreccordinnngg!!! upto {duration} of seconds..")
-#     frames = []
-
-#     # calculate no of chunks needed. 
-#     total_chunks = int( sr/ 1024 * duration)
-
-#     try:
-#         for _ in range(total_chunks):
-#             data = stream.read(1024, exception_on_overflow=False)
-#             audio_frame = np.frombuffer(data, dtype=np.int16) # convert to numpy
-            
-#             if audio_frame.size > 0:
-#                 frames.append(audio_frame) 
-#             else:
-#                 print("Warning! empty audio piece detected.")
-#     except Exception as e:
-#         print(f"Recording error: {str(e)}")
-#     finally:
-#         stream.stop_stream()
-#         stream.close()
-#         p.terminate()
-
-#     if not frames:
-#         raise ValueError ("No audio data recorded.")    
-    
-#     try: # explicit format specification
-#         sf.write(filename, np.concatenate(frames), sr, subtype="PCM_16")
-#         print(f"Sucessfully saved {len(frames)/sr:.1f}s audio to: {filename}")
-#     except Exception as e:
-#         print (f"file save error: {str(e)}")    
-#         raise
-
-    
-# # CORE FUNCTIONS
-# def update_plot(frame):
-#     current_time = time_buffer[-1] if time_buffer else 0
-#     x_data = [t - current_time for t in time_buffer]
-    
-#     for emotion in EMOTIONS:
-#         emotion_lines[emotion].set_data(x_data, emotion_history[emotion])
-#     ax.set_xlim(-HISTORY_SECONDS, 0)
-#     return list(emotion_lines.values())
-
-
-# def process_chunk(audio_chunk):
-#     try:
-#         if len(audio_chunk) < N_FFT:
-#             audio_chunk = np.pad(audio_chunk, (0, N_FFT - len(audio_chunk)))
-            
-#         audio_float = audio_chunk.astype(np.float32) / np.iinfo(np.int16).max
-#         mfccs = librosa.feature.mfcc(
-#             y=audio_float,
-#             sr=SAMPLE_RATE,
-#             n_mfcc=13,
-#             n_fft=N_FFT,
-#             hop_length=HOP_LENGTH,
-#             center=False
-#         )
-#         return torch.tensor(mfccs.T[-1:], dtype=torch.float32).unsqueeze(0)
-#     except Exception as e:
-#         print(f"Processing error: {str(e)}")
-#         return None
-    
-
-# # Predict Emotion
-# def predict_emotion(features):
-#     with torch.no_grad():
-#         outputs = model(features)
-#         probabilities = torch.softmax(outputs, dim=1).squeeze().numpy()
- 
-#     return {e: float(probabilities[i] * 100) for i, e in enumerate(EMOTIONS)}
-
-
-# ### EVALUATION
-# # def evaluate_model(test_loader):
-# #     model.eval()
-# #     all_preds = []
-# #     all_labels = []
-    
-# #     with torch.no_grad():
-# #         for features, labels in test_loader:
-# #             outputs = model(features)
-# #             preds = torch.argmax(outputs, dim=1)
-# #             all_preds.extend(preds.numpy())
-# #             all_labels.extend(labels.numpy())
-    
-# #     print(classification_report(all_labels, all_preds, target_names=EMOTIONS))
-    
-# #     # Confusion Matrix
-# #     cm = confusion_matrix(all_labels, all_preds)
-# #     plt.figure(figsize=(10,8))
-# #     sns.heatmap(cm, annot=True, fmt='d', xticklabels=EMOTIONS, yticklabels=EMOTIONS)
-# #     plt.title('Confusion Matrix')
-# #     plt.show()
-
-# # # Assuming you have a test_loader from your original training setup
-# # evaluate_model(test_loader)
-
-
-
-
-# def main():
-
-# # initialise audio 
-#     p = pyaudio.PyAudio()
-#     stream = p.open(
-#         format=pyaudio.paInt16,
-#         channels=1,
-#         rate=SAMPLE_RATE,
-#         input=True,
-#         frames_per_buffer=CHUNK_SIZE)
-
-#     # setup amimation
-#     anim = FuncAnimation(fig, 
-#                         update_plot,
-#                         blit=True,
-#                         interval= 50,
-#                         cache_frame_data=False,
-#                         save_count=BUFFER_SIZE)
-
-#     try:
-#         plt.show(block=False)
-#         print("Real-time emotion detection active. Ctrl+C to exit...")
-        
-#         start_time =  time.time()
-
-#         while True:
-#             # Read audio chunk
-#             try:
-#                 data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
-#                 audio_chunk = np.frombuffer(data, dtype=np.int16)
-                
-#                 # Process chunk
-#                 features = process_chunk(audio_chunk)
-#                 if features is not None:  # Explicit None check
-#                     predictions = predict_emotion(features)
-#                     current_time = time.time() - start_time
-                    
-#                     # Update buffers
-#                     time_buffer.append(current_time)
-#                     for emotion in EMOTIONS:
-#                         emotion_history[emotion].append(predictions[emotion])
-                    
-#                     # Update display
-#                     fig.canvas.flush_events()
-            
-#             except Exception as e:
-#                 print(f"Runtime error: {str(e)}")
-#                 continue
-                
-#     except KeyboardInterrupt:
-#         print("\nShutting down...")
-#     finally:
-#         stream.stop_stream()
-#         stream.close()
-#         p.terminate()
-#         plt.close()
-
-# if __name__ == "__main__":
-#     main()   
-
-
-########### ==============================
-
 import pyaudio
 import numpy as np
 import torch
@@ -241,81 +5,224 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from collections import deque
 import time
-from scripts.audio.utils.audio_utils import extract_features, AudioEmotionModel
+import threading
+import librosa
+from threading import Lock
+from scripts.audio.utils.audio_utils import extract_features
+import os
 
 class AudioEmotionDetector:
+    EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+    
     def __init__(self):
-        # Model config
-        self.model = AudioEmotionModel(13, 128, 2, 7)
-        self.model.load_state_dict(torch.load("./models/audio_emotion_model.pth", map_location="cpu"))
+        # Model configuration
+        self.model = torch.jit.load("./models/audio_emotion_model.pt", map_location='cpu')
         self.model.eval()
         
-        # Audio config
-        self.sr = 16000
-        self.chunk_size = 1024
-        self.emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+        # Audio configuration
+        self.sr = 16000          # Sample rate
+        self.chunk_size = 512    # Matches MFCC hop_length
+        self.buffer_duration = 3  # Seconds
+        self.audio_buffer = np.zeros(self.sr * self.buffer_duration)
+        self.last_process_time = time.time()
+
+        # Visualization configuration
+        self.buffer_size = 100    # Number of points to display
+        self.history_seconds = 10 # Time window for visualization
         
-        # Visualization
-        self.buffer_size = 100
+        # Data buffers with thread lock
+        self.buffer_lock = Lock()
         self.time_buffer = deque(maxlen=self.buffer_size)
-        self.emotion_buffers = {e: deque(maxlen=self.buffer_size) for e in self.emotions}
+        self.emotion_buffers = {e: deque(maxlen=self.buffer_size) for e in self.EMOTIONS}
+        
+        # Control flags
+        self.running = False
         
         # Initialize plot
-        plt.style.use('ggplot')
-        self.fig, self.ax = plt.subplots(figsize=(12,4))
-        self.lines = {e: self.ax.plot([], [], label=e)[0] for e in self.emotions}
+        plt.ion()
+        self.fig, self.ax = plt.subplots(figsize=(12, 4))
+        self.lines = {e: self.ax.plot([], [], label=e)[0] for e in self.EMOTIONS}
         self.ax.set_ylim(0, 100)
-        self.ax.legend()
+        self.ax.legend(loc='upper right')
+        self.ax.set_xlabel('Time (seconds)')
+        self.ax.set_ylabel('Probability (%)')
         
+        # Audio stream objects
+        self.p = None
+        self.stream = None
+
     def start(self):
-        # Audio stream
+        # Initialize audio stream
         self.p = pyaudio.PyAudio()
         self.stream = self.p.open(
             format=pyaudio.paInt16,
             channels=1,
             rate=self.sr,
             input=True,
-            frames_per_buffer=self.chunk_size
+            frames_per_buffer=self.chunk_size,
+            start=True
         )
         
-        # Start processing
-        self.ani = FuncAnimation(self.fig, self.update_plot, blit=True, interval=50)
-        plt.show(block=False)
-        self.process_audio()
+        # Start processing thread
+        self.running = True
+        self.process_thread = threading.Thread(target=self.process_audio, daemon=True)
+        self.process_thread.start()
         
-    def process_audio(self):
+        # Start animation
+        self.ani = FuncAnimation(
+            self.fig,
+            self.update_plot,
+            blit=True,
+            interval=50,
+            cache_frame_data=False,
+            save_count=100
+        )
+        
+        # Start main GUI loop
         try:
-            while True:
-                audio = np.frombuffer(self.stream.read(self.chunk_size), dtype=np.int16)
-                features = extract_features(audio)
-                
-                with torch.no_grad():
-                    outputs = self.model(features)
-                    probs = torch.softmax(outputs, dim=1).squeeze().numpy()
-                
-                # Update buffers
-                self.time_buffer.append(time.time())
-                for i, e in enumerate(self.emotions):
-                    self.emotion_buffers[e].append(probs[i] * 100)
-                
-                plt.pause(0.01)
-                
+            plt.show(block=True)
         except KeyboardInterrupt:
             self.stop()
-            
+
+    def process_audio(self):
+        try:
+            while self.running:
+                try:
+                    # Read audio chunk
+                    raw_data = self.stream.read(
+                        self.chunk_size,
+                        exception_on_overflow=False
+                    )
+                    audio = np.frombuffer(raw_data, dtype=np.int16)
+                    audio_float = audio.astype(np.float32) / 32768.0
+
+                    # Update rolling buffer
+                    self.audio_buffer = np.roll(self.audio_buffer, -self.chunk_size)
+                    self.audio_buffer[-self.chunk_size:] = audio_float
+                    
+                    # Process every 3 seconds
+                    current_time = time.time()
+                    if current_time - self.last_process_time >= self.buffer_duration:
+                        features = extract_features(self.audio_buffer, self.sr)
+                        processed = self.process_sequence(features, 130)
+                        
+                        with torch.no_grad():
+                            input_tensor = torch.tensor(processed).float().unsqueeze(0)
+                            outputs = self.model(input_tensor)
+                            probs = torch.softmax(outputs, dim=1).squeeze().numpy()
+
+                        # Update buffers with lock
+                        with self.buffer_lock:
+                            self.time_buffer.append(current_time)
+                            for i, e in enumerate(self.EMOTIONS):
+                                self.emotion_buffers[e].append(probs[i] * 100)
+                        
+                        self.last_process_time = current_time
+                        print(f"Predictions: {dict(zip(self.EMOTIONS, probs))}")
+
+                except OSError as e:
+                    if e.errno == -9981:  # Input overflow
+                        print("Buffer overflow - resetting stream...")
+                        self.stream.stop_stream()
+                        self.stream.start_stream()
+                        
+        except Exception as e:
+            print(f"Processing error: {str(e)}")
+        finally:
+            self.stop()
+
+    @staticmethod
+    def process_sequence(mfccs, target_length):
+        """Ensure fixed sequence length with padding/truncation"""
+        if mfccs.shape[0] > target_length:
+            return mfccs[:target_length]
+        return np.pad(mfccs, ((0, target_length - mfccs.shape[0]), (0, 0)), mode='constant')
+
     def update_plot(self, frame):
-        t = np.array(self.time_buffer) - (self.time_buffer[-1] if self.time_buffer else 0)
-        for e in self.emotions:
-            self.lines[e].set_data(t, self.emotion_buffers[e])
-        self.ax.set_xlim(min(t), 0)
+        with self.buffer_lock:
+            if self.time_buffer:
+                current_time = self.time_buffer[-1]
+                x_data = [t - current_time for t in self.time_buffer]
+                
+                # Convert numpy values to regular floats
+                for emotion in self.EMOTIONS:
+                    y_data = [float(v) for v in self.emotion_buffers[emotion]]
+                    self.lines[emotion].set_data(x_data, y_data)
+                
+                self.ax.set_xlim(-self.history_seconds, 0)
+                self.ax.relim()
+                self.ax.autoscale_view(scaley=False)
+        
         return list(self.lines.values())
-    
+
     def stop(self):
-        self.stream.stop_stream()
-        self.stream.close()
-        self.p.terminate()
-        plt.close()
+        if not self.running:
+            return
+        
+        self.running = False
+        
+        # Stop animation
+        if hasattr(self, 'ani'):
+            self.ani.event_source.stop()
+        
+        # Close plot
+        plt.close(self.fig)
+        
+        # Cleanup audio resources
+        if self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
+        if self.p:
+            self.p.terminate()
+        
+        # Wait for thread
+        if self.process_thread.is_alive():
+            self.process_thread.join(timeout=1)
+        
+        print("System fully stopped")
+
+    @classmethod
+    def test_audio_file(cls, file_path, model_path):
+        """Test audio file processing"""
+        model = torch.jit.load(model_path, map_location='cpu')
+        model.eval()
+        
+        y, sr = librosa.load(file_path, duration=3)
+        features = extract_features(y, sr)
+        processed = cls.process_sequence(features, 130)
+
+        print("MFCC Stats - Mean:", np.mean(features), "Std:", np.std(features), "Shape:", features.shape)
+        
+        with torch.no_grad():
+            input_tensor = torch.tensor(processed).float().unsqueeze(0)
+            outputs = model(input_tensor)
+            probs = torch.softmax(outputs, dim=1).squeeze().numpy()
+        
+        print("Test predictions:", dict(zip(cls.EMOTIONS, probs)))
+
+
+    # @classmethod
+    # def test_actor_files(cls, actor_dir, model_path):
+    #     """Test all files for an actor"""
+    #     actor_path = os.path.join("datasets", actor_dir)
+    #     for file in os.listdir(actor_path):
+    #         if file.endswith(".wav"):
+    #             cls.test_audio_file(os.path.join(actor_path, file), model_path)    
 
 if __name__ == "__main__":
-    detector = AudioEmotionDetector()
-    detector.start()
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test', type=str, help='Test audio file path')
+    args = parser.parse_args()
+
+    if args.test:
+        AudioEmotionDetector.test_audio_file(args.test, "./models/audio_emotion_model.pt")
+    else:
+        detector = AudioEmotionDetector()
+        try:
+            detector.start()
+        except KeyboardInterrupt:
+            detector.stop()
+
+

@@ -185,3 +185,6 @@ def real_time_emotion_detection(model_path):
 
 if __name__ == "__main__":
     real_time_emotion_detection("./models/emotion_model.pth")
+
+# Change model loading path
+# model = torch.load("../MODELS/emotion_model.pth")    
