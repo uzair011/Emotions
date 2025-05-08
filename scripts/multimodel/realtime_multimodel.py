@@ -1,6 +1,7 @@
 import os
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'  # Fix Metal compatibility
-os.environ['OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS'] = '0'  # Disable hardware acceleration
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'  # Disable Metal
+os.environ['OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS'] = '0'
+os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'videoio;avfoundation'
 
 import threading
 import queue
@@ -9,8 +10,8 @@ import pyaudio
 import numpy as np
 import torch
 from torchvision import transforms
-from ..audio.utils.audio_utils import extract_features
-from ..visual.inference_resnet18 import load_model as load_visual_model 
+from scripts.audio.utils.audio_utils import extract_features
+from scripts.visual.inference_resnet18 import load_model as load_visual_model 
 
 
 class MultimodelEmotionDetector:
@@ -27,7 +28,10 @@ class MultimodelEmotionDetector:
         self.lock = threading.Lock()
         
         # Hardware setup with error handling
+        #self.cap = cv2.VideoCapture(0)
+        print(cv2.getBuildInformation())
         self.cap = cv2.VideoCapture(0)
+
         if not self.cap.isOpened():
             raise RuntimeError("Could not open video device")
             
@@ -40,10 +44,11 @@ class MultimodelEmotionDetector:
             frames_per_buffer=1024,
             start=False
         )
+        self.running = True
 
     def _audio_capture(self):
         try:
-            while True:
+            while self.running:
                 data = self.stream.read(1024, exception_on_overflow=False)
                 audio = np.frombuffer(data, dtype=np.int16)
                 with self.lock:
@@ -120,11 +125,13 @@ class MultimodelEmotionDetector:
                 if self.latest_frame is not None:
                     display_frame = self.latest_frame.copy()
                     cv2.putText(display_frame, f"Emotion: {EMOTIONS[emotion_idx]}", 
-                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                     cv2.imshow("Multimodel Emotion Detection", display_frame)
-                    cv2.waitKey(1)
+                    # Add explicit waitKey
+                    cv2.waitKey(1) & 0xFF  
         except Exception as e:
             print(f"Display error: {str(e)}")
+            self.running = False
 
     def start(self):
         # Start audio stream after thread creation
@@ -150,6 +157,7 @@ class MultimodelEmotionDetector:
             self._cleanup()
 
     def _cleanup(self):
+        self.running = False
         self.stream.stop_stream()
         self.stream.close()
         self.audio.terminate()

@@ -15,9 +15,16 @@ from torchvision.models import resnet18
 from torchvision import transforms, datasets
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+
+
+
+import numpy as np
+
+
 
 # Import the FER2013Dataset and transform utilities
-from utils.visual_data_loader import FER2013Dataset, get_transforms
+from scripts.visual.utils.visual_data_loader import FER2013Dataset, get_transforms
 
 # Define the Model
 def get_model(num_classes=7):
@@ -117,6 +124,52 @@ def plot_metrics(epochs, train_losses, val_losses, train_accuracies, val_accurac
     plt.show()
 
 
+
+
+def evaluate_model(model, val_loader, device):
+    model.eval()
+    y_true = []
+    y_pred = []
+
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images = images.to(device)
+            outputs = model(images)
+            preds = outputs.argmax(1).cpu()
+            y_pred.extend(preds.numpy())
+            y_true.extend(labels.numpy())
+
+    # Generate confusion matrix
+    labels_list = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Plot using matplotlib
+    plt.figure(figsize=(10, 7))
+    plt.imshow(cm, interpolation='nearest', cmap='Blues')
+    plt.title('ResNet-18 Confusion Matrix (FER2013)', pad=20)
+    plt.colorbar()
+
+    # Add labels
+    tick_marks = np.arange(len(labels_list))
+    plt.xticks(tick_marks, labels_list, rotation=45)
+    plt.yticks(tick_marks, labels_list)
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+
+    # Add text annotations
+    threshold = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, format(cm[i, j], 'd'),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > threshold else "black")
+
+    plt.tight_layout()
+    os.makedirs('visual', exist_ok=True)
+    plt.savefig('visual/resnet18_confusion_matrix.png', dpi=300, bbox_inches='tight')
+    plt.close()
+
+
 def main():
     # Paths to CSV files
     train_folder = './datasets/train' 
@@ -152,6 +205,7 @@ def main():
     model_path = './models/emotion_model.pth'
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
+    evaluate_model(model, val_loader, device)
 
 if __name__ == "__main__":
     main()

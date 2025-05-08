@@ -28,7 +28,7 @@ def extract_features(audio, sr):
     # Normalise audio first
     audio = librosa.util.normalize(audio)
     
-    # Extract MFCCs with proper settings
+    # Extract MFCCs with correct settings
     mfccs = librosa.feature.mfcc(
         y=audio,
         sr=sr,
