@@ -201,13 +201,7 @@ class AudioEmotionDetector:
         print("Test predictions:", dict(zip(cls.EMOTIONS, probs)))
 
 
-    # @classmethod
-    # def test_actor_files(cls, actor_dir, model_path):
-    #     """Test all files for an actor"""
-    #     actor_path = os.path.join("datasets", actor_dir)
-    #     for file in os.listdir(actor_path):
-    #         if file.endswith(".wav"):
-    #             cls.test_audio_file(os.path.join(actor_path, file), model_path)    
+
 
 if __name__ == "__main__":
     import argparse
